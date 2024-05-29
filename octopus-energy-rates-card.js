@@ -167,9 +167,9 @@ class OctopusEnergyRatesCard extends HTMLElement {
             }
         }
 
-        var lowlimit = config.lowlimit;
-        var mediumlimit = config.mediumlimit;
-        var highlimit = config.highlimit;
+        let lowlimit = config.lowlimit;
+        let mediumlimit = config.mediumlimit;
+        let highlimit = config.highlimit;
 
         // Check if we've received a number, if not, assume they are entities
         // and read them from the state
@@ -192,9 +192,10 @@ class OctopusEnergyRatesCard extends HTMLElement {
         const combinerate = config.combinerate;
         const multiplier = config.multiplier
         const rateListLimit = config.rateListLimit
-        var colours = (config.exportrates ? colours_export : colours_import);
-        var rates_totalnumber = 0;
-        var combinedRates = [];
+        const maxRates = config.maxRates;
+        let colours = (config.exportrates ? colours_export : colours_import);
+        let rates_totalnumber = 0;
+        let combinedRates = [];
 
         // Grab the rates which are stored as an attribute of the sensor
         const paststate = hass.states[pastEntityId];
@@ -208,7 +209,7 @@ class OctopusEnergyRatesCard extends HTMLElement {
         const limitMedMult = config.mediumLimitMultiplier;
 
         // Create an empty array to store the parsed attributes
-        var additionalDynamicLimits = [];
+        let additionalDynamicLimits = [];
         const additionalDynamicLimitsEntities = config.additionalDynamicLimits && Object.keys(config.additionalDynamicLimits) || [];
         // Iterate through each entity in additionalDynamicLimitsEntities
         for (const entityId of additionalDynamicLimitsEntities) {
@@ -237,7 +238,7 @@ class OctopusEnergyRatesCard extends HTMLElement {
         // Combine the data sources
         if (typeof (paststate) != 'undefined' && paststate != null) {
             const pastattributes = this.reverseObject(paststate.attributes);
-            var ratesPast = pastattributes.rates;
+            let ratesPast = pastattributes.rates;
 
             ratesPast.forEach(function (key) {
                 combinedRates.push(key);
@@ -245,9 +246,10 @@ class OctopusEnergyRatesCard extends HTMLElement {
             });
         }
 
+        let ratesCurrent = [];
         if (typeof (currentstate) != 'undefined' && currentstate != null) {
             const currentattributes = this.reverseObject(currentstate.attributes);
-            var ratesCurrent = currentattributes.rates;
+            ratesCurrent = currentattributes.rates;
 
             ratesCurrent.forEach(function (key) {
                 combinedRates.push(key);
@@ -264,7 +266,7 @@ class OctopusEnergyRatesCard extends HTMLElement {
 
         if (typeof (futurestate) != 'undefined' && futurestate != null) {
             const futureattributes = this.reverseObject(futurestate.attributes);
-            var ratesFuture = futureattributes.rates;
+            let ratesFuture = futureattributes.rates;
 
             ratesFuture.forEach(function (key) {
                 combinedRates.push(key);
@@ -275,72 +277,56 @@ class OctopusEnergyRatesCard extends HTMLElement {
         // This is critical to breaking down the columns properly. For now, there's now
         // two loops doing the same thing which is not ideal.
         // TODO: there should be one clear data process loop and one rendering loop? Or a function?
-        var rates_list_length = 0;
-        var cheapest_rate = 5000;
-        var previous_rate = 0;
+        let rates_list_length = 0;
+        let cheapest_rate = 5000;
+        let previous_rate = 0;
 
-        var rates_currentNumber = 0;
-        var previous_rates_day = "";
-        var rates_processingRow = 0;
-        var filteredRates = [];
+        let previous_rates_day = "";
+        let rates_processingRow = 0;
 
-        // filter out rates to display
-        combinedRates.forEach(function (key) {
-            const date_milli = Date.parse(key.start);
-            var date = new Date(date_milli);
+        const filteredRates = combinedRates.filter((rate, index) => {
+            const date_milli = Date.parse(rate.start);
+            let date = new Date(date_milli);
             const lang = navigator.language || navigator.languages[0];
-            var current_rates_day = date.toLocaleDateString(lang, { weekday: 'short' });
+            let current_rates_day = date.toLocaleDateString(lang, { weekday: 'short' });
             rates_processingRow++;
-            var ratesToEvaluate = key.value_inc_vat * multiplier;
+            let ratesToEvaluate = rate.value_inc_vat * multiplier;
 
             if ((showpast || (date - Date.parse(new Date()) > -1800000)) && (rateListLimit == 0 || rates_list_length < rateListLimit)) {
-                rates_currentNumber++;
-
                 // Find the cheapest rate that hasn't past yet
                 if ((ratesToEvaluate < cheapest_rate) && (date - Date.parse(new Date()) > -1800000)) cheapest_rate = ratesToEvaluate;
 
                 // If we don't want to combine same values rates then just push them to new display array
-                if (!combinerate) {
-                    filteredRates.push(key);
-                    rates_list_length++;
-                }
+                if (!combinerate) return true;
 
-                if (combinerate &&
-                    (
-                        (rates_currentNumber == 1)
-                        || (current_rates_day != previous_rates_day)
-                        || (previous_rate != ratesToEvaluate)
-                    )
-                ) {
-                    filteredRates.push(key);
-                    rates_list_length++;
-                }
+                if (index == 1 || current_rates_day != previous_rates_day || previous_rate != ratesToEvaluate) return true;
+
                 previous_rate = ratesToEvaluate;
                 previous_rates_day = current_rates_day;
             }
-        });
+        }).slice(0, maxRates);
 
-        const rows_per_col = Math.ceil(rates_list_length / config.cols);
+        const rows_per_col = Math.ceil(filteredRates.length / config.cols);
 
-        var tables = "";
+        let tables = "";
         tables = tables.concat("<td><table class='sub_table'><tbody>");
-        var table = ""
-        var x = 1;
+        let table = ""
+        let x = 1;
 
         filteredRates.forEach(function (key) {
             const date_milli = Date.parse(key.start);
-            var date = new Date(date_milli);
+            let date = new Date(date_milli);
             const lang = navigator.language || navigator.languages[0];
-            var options = { hourCycle: 'h23', hour12: hour12, hour: '2-digit', minute: '2-digit' };
+            let options = { hourCycle: 'h23', hour12: hour12, hour: '2-digit', minute: '2-digit' };
             // The time formatted in the user's Locale
-            var time_locale = date.toLocaleTimeString(lang, options);
+            let time_locale = date.toLocaleTimeString(lang, options);
             // If the showday config option is set, include the shortened weekday name in the user's Locale
-            var date_locale = (showday ? date.toLocaleDateString(lang, { weekday: 'short' }) + ' ' : '');
+            let date_locale = (showday ? date.toLocaleDateString(lang, { weekday: 'short' }) + ' ' : '');
 
-            var colour = colours[1];  // Default to 'green' (index 1) (below low limit above 0)
-            var isTargetTime = false;
-            var targetTimeBackgroundColor = "";
-            var targetTimePrefix = "";
+            let colour = colours[1];  // Default to 'green' (index 1) (below low limit above 0)
+            let isTargetTime = false;
+            let targetTimeBackgroundColor = "";
+            let targetTimePrefix = "";
             // Check if the current time row corresponds to a target time
             allSlotsTargetTimes.forEach(function (targetTime) {
                 const startTime = new Date(targetTime.start);
@@ -362,7 +348,7 @@ class OctopusEnergyRatesCard extends HTMLElement {
 
             // Add the extra space at the end of the prefix if it's not empty
             targetTimePrefix = targetTimePrefix ? targetTimePrefix + " " : targetTimePrefix;
-            var isCurrentTime = false;
+            let isCurrentTime = false;
             if ((date - Date.parse(new Date()) > -1800000) && (date < new Date())) {
                 if (showpast) {
                     isCurrentTime = true;
@@ -370,9 +356,9 @@ class OctopusEnergyRatesCard extends HTMLElement {
             };
 
 
-            var valueToDisplay = key.value_inc_vat * multiplier;
+            let valueToDisplay = key.value_inc_vat * multiplier;
             // Apply bold styling if the current time is a target time
-            var boldStyle = isCurrentTime ? "current " : "";
+            let boldStyle = isCurrentTime ? "current " : "";
             boldStyle = isTargetTime ? boldStyle + "time_highlight" : boldStyle + "";
             if (cheapest && (valueToDisplay == cheapest_rate && cheapest_rate > 0)) colour = colours[5];
             else if (cheapest && (valueToDisplay == cheapest_rate && cheapest_rate <= 0)) colour = colours[6];
@@ -409,15 +395,15 @@ class OctopusEnergyRatesCard extends HTMLElement {
     }
 
     reverseObject(object) {
-        var newObject = {};
-        var keys = [];
+        let newObject = {};
+        let keys = [];
 
-        for (var key in object) {
+        for (let key in object) {
             keys.push(key);
         }
 
-        for (var i = keys.length - 1; i >= 0; i--) {
-            var value = object[keys[i]];
+        for (let i = keys.length - 1; i >= 0; i--) {
+            let value = object[keys[i]];
             newObject[keys[i]] = value;
         }
 
